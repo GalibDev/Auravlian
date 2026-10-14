@@ -1,5 +1,15 @@
 # Changelog
 
+## Phase 4 — Personal collections
+
+- Schema version 2 upgrades libraries with playlists, ordered membership, favorites and listening history.
+- Create/rename/delete playlists, add/remove songs and reorder with Move up/down.
+- Favorite Library selections and remove favorites from their dedicated page.
+- Album/artist drill-down and playable collections share the existing player/queue.
+- Actual decoded playback starts populate persisted recent history without pause/resume duplicates.
+- Background serialized collection writes, actionable errors and Home collection summaries.
+- Phase 4 focused tests and an isolated real-WAV visual/persistence smoke; older suites intentionally not rerun.
+
 ## Phase 3 — Persistent local library
 
 - Versioned transactional SQLite schema and normalized tracks, artists, albums and folders.

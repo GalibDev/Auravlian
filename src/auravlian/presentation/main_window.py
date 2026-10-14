@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 )
 
 from auravlian.app.container import Container
-from auravlian.presentation.pages.base import EmptyPage
+from auravlian.presentation.pages.collections import CollectionPage
 from auravlian.presentation.pages.home import HomePage
 from auravlian.presentation.pages.library import LibraryPage
 from auravlian.presentation.pages.now_playing import NowPlayingPage
@@ -30,26 +30,14 @@ class MainWindow(QMainWindow):
         self.sidebar = Sidebar()
         self.stack = QStackedWidget()
         self.player_vm = container.player
-        home = HomePage(container.library)
+        home = HomePage(container.library, container.collections)
         home.open_requested.connect(self.open_files)
         home.library_requested.connect(lambda: self.navigate("Library"))
         self.pages: dict[str, QWidget] = {"Home": home}
-        definitions = {
-            "Albums": ("Every record has a story.", "No albums yet",
-                       "Albums will be grouped from your local music metadata.", 4),
-            "Artists": ("The voices behind your collection.", "No artists yet",
-                        "Discover artists from your imported library in Phase 4.", 4),
-            "Playlists": ("A soundtrack for every moment.", "Create your own flow",
-                          "Playlist creation and editing arrive in Phase 4.", 4),
-            "Favorites": ("Keep the songs that stay with you.", "Nothing favorited yet",
-                          "Mark favorites from your library in Phase 4.", 4),
-            "Recently Played": ("Find your way back to a feeling.", "Your history begins with a play",
-                                "Listening history arrives in Phase 4.", 4),
-        }
-        for name, (subtitle, empty, detail, phase) in definitions.items():
-            self.pages[name] = EmptyPage(name, subtitle, empty, detail, phase)
+        for name in ("Albums", "Artists", "Playlists", "Favorites", "Recently Played"):
+            self.pages[name] = CollectionPage(name, container.collections)
         self.pages["Settings"] = SettingsPage(container.settings)
-        self.pages["Library"] = LibraryPage(container.library)
+        self.pages["Library"] = LibraryPage(container.library, container.collections)
         now_playing = NowPlayingPage(self.player_vm)
         now_playing.open_requested.connect(self.open_files)
         self.pages["Now Playing"] = now_playing
@@ -97,7 +85,7 @@ class MainWindow(QMainWindow):
         self.player_vm.service.stop()
         self.container.settings.setValue("window/geometry", self.saveGeometry())
         self.container.settings.sync()
-        if self.container.library.service.busy:
+        if self.container.library.service.busy or self.container.collections.service.busy:
             self.container.library.service.cancel()
             event.ignore()
             QTimer.singleShot(50, self.close)

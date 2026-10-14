@@ -46,7 +46,7 @@ def test_migrations_idempotent_and_reject_future(tmp_path):
     migrate(path)
     migrate(path)
     with connection(path) as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 2
         assert db.execute("PRAGMA foreign_keys").fetchone()[0] == 1
         db.execute("PRAGMA user_version=99")
     with pytest.raises(RuntimeError, match="newer"):

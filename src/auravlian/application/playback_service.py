@@ -16,6 +16,7 @@ from auravlian.domain.playback.repeat_mode import RepeatMode
 class PlaybackService(QObject):
     changed = Signal()
     error_raised = Signal(str)
+    track_started = Signal(object)
 
     def __init__(self, audio: AudioPort, queue: PlaybackQueue,
                  parent: QObject | None = None) -> None:
@@ -34,6 +35,7 @@ class PlaybackService(QObject):
         self._failed: set[Path] = set()
         self._failure_pending = False
         self._closed = False
+        self._recorded_generation = -1
 
     def open_files(self, paths: Iterable[str | Path]) -> None:
         tracks: list[Track] = []
@@ -153,6 +155,13 @@ class PlaybackService(QObject):
         if self.state != "error" and not self._closed:
             self.state = state if self.queue.current else "empty"
             self.changed.emit()
+            self._record_start()
+
+    def _record_start(self) -> None:
+        if (self.state == "playing" and self.ready and self.queue.current is not None
+                and self._recorded_generation != self._generation):
+            self._recorded_generation = self._generation
+            self.track_started.emit(self.queue.current)
 
     def on_position(self, milliseconds: int) -> None:
         self.position = milliseconds
@@ -165,6 +174,7 @@ class PlaybackService(QObject):
     def on_ready(self, ready: bool) -> None:
         self.ready = ready and self.state != "error"
         self.changed.emit()
+        self._record_start()
 
     def on_seekable(self, seekable: bool) -> None:
         self.seekable = seekable

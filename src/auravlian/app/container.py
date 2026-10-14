@@ -19,6 +19,9 @@ from auravlian.presentation.viewmodels.library_vm import LibraryViewModel
 from auravlian.shared.paths import data_path
 
 from auravlian.shared.events import AppEvents
+from auravlian.application.playlist_service import PlaylistService
+from auravlian.infrastructure.database.repositories.collection_repository import CollectionRepository
+from auravlian.presentation.viewmodels.playlist_vm import CollectionViewModel
 
 
 @dataclass
@@ -28,6 +31,23 @@ class Container:
     _player: PlayerViewModel | None = field(default=None, init=False, repr=False)
     _saved_audio: tuple[int, bool] | None = field(default=None, init=False, repr=False)
     _library: LibraryViewModel | None = field(default=None, init=False, repr=False)
+    _collections: CollectionViewModel | None = field(default=None, init=False, repr=False)
+
+    @property
+    def collections(self) -> CollectionViewModel:
+        if self._collections is None:
+            library = self.library
+            repository = library.service.repository
+            assert isinstance(repository, LibraryRepository)
+            service = PlaylistService(CollectionRepository(repository.database),
+                                      partial(migrate, repository.database), QCoreApplication.instance())
+            self._collections = CollectionViewModel(service, library, QCoreApplication.instance())
+            self.player.service.track_started.connect(service.record)
+            app = QCoreApplication.instance()
+            if app is not None:
+                app.aboutToQuit.connect(service.shutdown)
+            service.refresh()
+        return self._collections
 
     @property
     def library(self) -> LibraryViewModel:

@@ -3,18 +3,20 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView, QFileDialog, QHBoxLayout, QHeaderView, QLineEdit,
-    QPushButton, QTableView, QVBoxLayout, QWidget,
+    QPushButton, QTableView, QVBoxLayout, QWidget, QInputDialog,
 )
 
 from auravlian.presentation.pages.base import label
 from auravlian.presentation.viewmodels.library_vm import LibraryViewModel
 from auravlian.presentation.widgets.track_table import TrackTableModel, TrackFilterModel
+from auravlian.presentation.viewmodels.playlist_vm import CollectionViewModel
 
 
 class LibraryPage(QWidget):
-    def __init__(self, vm: LibraryViewModel) -> None:
+    def __init__(self, vm: LibraryViewModel, collections: CollectionViewModel | None = None) -> None:
         super().__init__()
         self.vm = vm
+        self.collections = collections
         layout = QVBoxLayout(self)
         layout.setContentsMargins(36, 30, 36, 30)
         layout.setSpacing(16)
@@ -61,6 +63,16 @@ class LibraryPage(QWidget):
         self.play_selected = QPushButton("Play selected")
         self.play_selected.setObjectName("primary")
         layout.addWidget(self.play_selected)
+        actions = QHBoxLayout()
+        self.favorite = QPushButton("Favorite selected")
+        self.add_playlist = QPushButton("Add to playlist…")
+        actions.addWidget(self.favorite)
+        actions.addWidget(self.add_playlist)
+        layout.addLayout(actions)
+        self.favorite.clicked.connect(self._favorite)
+        self.add_playlist.clicked.connect(self._add_playlist)
+        if collections is not None:
+            collections.changed.connect(self._collection_status)
         self.search.textChanged.connect(self.proxy.search)
         self.proxy.rowsInserted.connect(self._empty_state)
         self.proxy.rowsRemoved.connect(self._empty_state)
@@ -96,6 +108,35 @@ class LibraryPage(QWidget):
         rows = self.table.selectionModel().selectedRows()
         self.play_selected.setEnabled(any(
             not self.model.tracks[self.proxy.mapToSource(row).row()].missing for row in rows))
+        enabled = bool(rows) and self.collections is not None and not self.collections.service.busy
+        self.favorite.setEnabled(enabled)
+        self.add_playlist.setEnabled(enabled)
+
+    def _selected_paths(self) -> list[Path]:
+        return [self.model.tracks[self.proxy.mapToSource(row).row()].path
+                for row in sorted(self.table.selectionModel().selectedRows(), key=lambda index: index.row())]
+
+    def _collection_status(self) -> None:
+        self._selection()
+        if self.collections is not None:
+            self.status.setText(self.collections.service.error or self.vm.service.status)
+
+    def _favorite(self) -> None:
+        if self.collections is not None:
+            self.collections.service.favorite(self._selected_paths(), True)
+
+    def _add_playlist(self) -> None:
+        if self.collections is None:
+            return
+        playlists = self.collections.service.snapshot.playlists
+        if not playlists:
+            self.status.setText("Create a playlist on the Playlists page first.")
+            return
+        name, accepted = QInputDialog.getItem(self, "Add to playlist", "Playlist",
+                                             [p.name for p in playlists], editable=False)
+        if accepted:
+            playlist = next(p for p in playlists if p.name == name)
+            self.collections.service.add(playlist.id, self._selected_paths())
 
     def _play_selection(self) -> None:
         rows = sorted(self.table.selectionModel().selectedRows(), key=lambda index: index.row())

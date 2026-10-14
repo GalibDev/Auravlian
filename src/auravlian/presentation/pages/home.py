@@ -3,15 +3,18 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLineEdit, QPushButton, QVBox
 
 from auravlian.presentation.pages.base import label
 from auravlian.presentation.viewmodels.library_vm import LibraryViewModel
+from auravlian.presentation.viewmodels.playlist_vm import CollectionViewModel
 
 
 class HomePage(QWidget):
     open_requested = Signal()
     library_requested = Signal()
 
-    def __init__(self, library: LibraryViewModel | None = None) -> None:
+    def __init__(self, library: LibraryViewModel | None = None,
+                 collections: CollectionViewModel | None = None) -> None:
         super().__init__()
         self.library_vm = library
+        self.collection_vm = collections
         layout = QVBoxLayout(self)
         layout.setContentsMargins(36, 30, 36, 30)
         layout.setSpacing(20)
@@ -71,8 +74,8 @@ class HomePage(QWidget):
         recent.setObjectName("card")
         recent_body = QVBoxLayout(recent)
         recent_body.setContentsMargins(18, 16, 18, 16)
-        recent_body.addWidget(label("Your listening history will appear here after your first play.",
-                                    "subtitle"))
+        self.recent_history = label("Your listening history will appear here after your first play.", "subtitle")
+        recent_body.addWidget(self.recent_history)
         layout.addWidget(recent)
         layout.addStretch()
         layout.addWidget(label("LOCAL MUSIC  ·  Import, search and play from Music Library.",
@@ -80,6 +83,18 @@ class HomePage(QWidget):
         if library is not None:
             library.changed.connect(self.refresh_library)
             self.refresh_library()
+        if collections is not None:
+            collections.changed.connect(self.refresh_collections)
+            self.refresh_collections()
+
+    def refresh_collections(self) -> None:
+        if self.collection_vm is None:
+            return
+        snapshot = self.collection_vm.service.snapshot
+        self.collection_labels[2].setText(f"{len(snapshot.favorites)} favorites")
+        self.collection_labels[3].setText(f"{len(snapshot.playlists)} playlists")
+        self.recent_history.setText("  ·  ".join(track.title for track in snapshot.history[:3]) or
+                                   "Your listening history will appear here after your first play.")
 
     def refresh_library(self) -> None:
         if self.library_vm is None:
