@@ -82,6 +82,14 @@ class PlaybackService(QObject):
             return
         self.audio.load(track.path)
 
+    def open_tracks(self, tracks: Iterable[Track]) -> None:
+        """Play repository snapshots without discarding their metadata."""
+        selected = list(tracks)
+        if selected:
+            self._failed.clear()
+            self.queue.replace(selected)
+            self._load_current()
+
     def play(self) -> None:
         if self.queue.current is None:
             return

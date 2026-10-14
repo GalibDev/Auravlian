@@ -1,4 +1,4 @@
-from PySide6.QtCore import QByteArray
+from PySide6.QtCore import QByteArray, QTimer
 from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
 from PySide6.QtWidgets import (
     QFileDialog, QHBoxLayout, QMainWindow, QScrollArea, QStackedWidget, QVBoxLayout, QWidget,
@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from auravlian.app.container import Container
 from auravlian.presentation.pages.base import EmptyPage
 from auravlian.presentation.pages.home import HomePage
+from auravlian.presentation.pages.library import LibraryPage
 from auravlian.presentation.pages.now_playing import NowPlayingPage
 from auravlian.presentation.pages.settings import SettingsPage
 from auravlian.presentation.widgets.playback_bar import PlaybackBar
@@ -29,12 +30,11 @@ class MainWindow(QMainWindow):
         self.sidebar = Sidebar()
         self.stack = QStackedWidget()
         self.player_vm = container.player
-        home = HomePage()
+        home = HomePage(container.library)
         home.open_requested.connect(self.open_files)
+        home.library_requested.connect(lambda: self.navigate("Library"))
         self.pages: dict[str, QWidget] = {"Home": home}
         definitions = {
-            "Library": ("All your music, beautifully together.", "Your library starts here",
-                        "Import local files and folders in Phase 3.", 3),
             "Albums": ("Every record has a story.", "No albums yet",
                        "Albums will be grouped from your local music metadata.", 4),
             "Artists": ("The voices behind your collection.", "No artists yet",
@@ -49,6 +49,7 @@ class MainWindow(QMainWindow):
         for name, (subtitle, empty, detail, phase) in definitions.items():
             self.pages[name] = EmptyPage(name, subtitle, empty, detail, phase)
         self.pages["Settings"] = SettingsPage(container.settings)
+        self.pages["Library"] = LibraryPage(container.library)
         now_playing = NowPlayingPage(self.player_vm)
         now_playing.open_requested.connect(self.open_files)
         self.pages["Now Playing"] = now_playing
@@ -96,5 +97,10 @@ class MainWindow(QMainWindow):
         self.player_vm.service.stop()
         self.container.settings.setValue("window/geometry", self.saveGeometry())
         self.container.settings.sync()
+        if self.container.library.service.busy:
+            self.container.library.service.cancel()
+            event.ignore()
+            QTimer.singleShot(50, self.close)
+            return
         super().closeEvent(event)
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## Phase 3 — Persistent local library
+
+- Versioned transactional SQLite schema and normalized tracks, artists, albums and folders.
+- Background QRunnable/QThreadPool file/folder import, recursive scanning and path deduplication.
+- Mutagen metadata/fallbacks and content-addressed embedded-artwork thumbnails.
+- Searchable/sortable Qt model/view Library, metadata-preserving playback and Home collection counts.
+- Rescans preserve track identities, detect missing files and restore availability; cancellation saves partial work.
+- Worker-owned database connections, bounded warning details, cooperative shutdown and regression coverage.
+- Original Phase 1/2 tests, branding, settings and shared engine preserved; Phase 4 features remain deferred.
+
 ## Phase 2 — Local playback
 
 - One application-owned Qt Multimedia player/output adapter, pure playback queue, service and shared view model.

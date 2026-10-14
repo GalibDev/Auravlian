@@ -2,11 +2,19 @@
 
 **Feel Beyond Sound.** A native, offline-first Windows music player built with Python 3.12 and PySide6 Qt Widgets.
 
-## Current status: Phase 2
+## Current status: Phase 3
 
-The native foundation includes nine navigation destinations, the Aurora dark design system, original-symbol branding, saved window geometry and startup preferences, and rotating JSON logs. Phase 2 adds actual local playback through exactly one application-owned QMediaPlayer and QAudioOutput, a pure-Python queue, a PlaybackService and a shared PlayerViewModel. Library import and persistence remain Phase 3 work.
+The native foundation includes nine navigation destinations, the Aurora dark design system, original-symbol branding, saved window geometry and startup preferences, and rotating JSON logs. Actual local playback uses exactly one application-owned QMediaPlayer and QAudioOutput, a pure-Python queue, a PlaybackService and a shared PlayerViewModel. Phase 3 adds a persistent SQLite library with background import, metadata, artwork thumbnails, search, sorting and rescans.
 
-Use **Home → Open audio files**, **Now Playing → Open audio files**, or **File → Open audio files (Ctrl+O)**. Selecting files replaces the session queue and begins playback. Cancelling preserves playback. Tracks use their filename as a title until metadata support arrives. Opening files is not a library import.
+Use **Home → Open audio files**, **Now Playing → Open audio files**, or **File → Open audio files (Ctrl+O)** for immediate session playback. Selecting files replaces the session queue and begins playback; cancelling preserves playback. Direct-open titles use filenames. Opening files is separate from persistent library import.
+
+Use **Library → Import files / Import folder** to add music permanently to the local database. Folders scan recursively without following nested directory symlinks. Supported scanner extensions are MP3, FLAC, WAV, Ogg, M4A, AAC, WMA, Opus and AIFF; actual metadata/playback support depends on file content and codecs. Canonical path identity deduplicates repeated/overlapping imports, not distinct copies with identical audio content. Untagged valid files use filename, Unknown artist and Unknown album. Corrupt or unreadable inputs are skipped with warnings.
+
+Search matches all entered words across title, artist and album, ignoring case. Click column headers to sort (duration sorts numerically). Double-click an available row or select rows and choose **Play selected**; the current player/queue is reused and metadata titles are retained. Missing rows remain searchable but cannot be selected for playback. Home shows counts from imported album/artist groups; dedicated album/artist browsing is Phase 4.
+
+**Rescan** revisits remembered folders and individually imported paths, refreshes metadata, discovers additions and marks absent tracks Missing. It preserves track IDs and creation timestamps; rows are never deleted by rescans. Restored files become available again. **Cancel** keeps already processed imports and skips the missing-status sweep. Only one library job runs at a time. Close requests cancel active work and defer window destruction while the worker finishes; application shutdown joins the pool. Cancellation is cooperative between files, so a slow filesystem or decoder call can delay completion.
+
+Embedded APIC/FLAC/MP4/Vorbis artwork is extracted where available into content-addressed PNG thumbnails (at most 192×192). Invalid/oversized images fall back to no artwork; extraction/cache errors are logged while valid audio metadata remains importable. GUI icons use a bounded 128-entry cache. No generated artwork substitutes for missing covers.
 
 The persistent bar supports play/pause, stop, next, previous, seek, volume, mute, shuffle and repeat off/one/all. Empty-queue controls are disabled; Play and seek remain disabled while loading. Volume and mute are saved in QSettings. Closing the main window stops playback; navigating between pages preserves it.
 
@@ -28,11 +36,11 @@ After installation, the `auravlian` console entry point also launches the app. N
 
 ## Architecture
 
-`src/auravlian/app` owns startup, dependencies and lifecycle. `presentation` owns Qt pages, reusable widgets, the shared player view model and theme tokens. `domain` owns the pure track model, authoritative PlaybackQueue, RepeatMode and AudioPort protocol; `application` orchestrates playback; `infrastructure/audio` owns the single Qt player/output adapter. SQLite, scanners, metadata and artwork remain reserved. `shared` contains paths, errors and application events.
+`src/auravlian/app` owns startup, dependencies and lifecycle. `presentation` owns Qt pages, QAbstractTableModel/QSortFilterProxyModel, library/player view models and theme tokens. `domain` owns immutable track snapshots, the authoritative PlaybackQueue, RepeatMode and port protocols. `application` orchestrates playback, background library jobs and matching. Infrastructure provides the Qt audio adapter, SQLite connections/migrations/repository, scanner, Mutagen metadata reader and artwork cache. Every database operation creates and closes its connection on the calling worker thread; no connection is shared across threads. Imports write transactional batches of 64, with foreign keys and WAL enabled.
 
-Files for later phases are explicitly reserved modules, not implemented services. Library-related pages retain shared empty states. Home and Now Playing connect to the same session player. The source-root `assets` directory preserves provided branding, while packaged assets live inside the Python package so installed launches do not depend on the working directory.
+Files for later phases remain explicitly reserved modules. Albums, Artists, Playlists, Favorites and Recently Played retain their Phase 4 empty shells. Home, Library and Now Playing use the same session player. The source-root `assets` directory preserves provided branding, while packaged assets live inside the Python package so installed launches do not depend on the working directory.
 
-User settings use QSettings under `HKEY_CURRENT_USER\Software\Auravlian\Auravlian`. Logs use Qt's per-user AppLocalDataLocation, never the installation directory. Geometry and last-page state save on close; startup preference saves immediately.
+User settings use QSettings under `HKEY_CURRENT_USER\Software\Auravlian\Auravlian`. Logs, `library.sqlite3` and the `artwork` cache use Qt's per-user AppLocalDataLocation, never the installation directory. Tests/previews use isolated INI sessions and keep their databases/caches beside their INI. Geometry and last-page state save on close; startup preference saves immediately. Schema version 1 normalizes tracks, artists, albums and watched folders; migrations are transactional and reject newer unknown schemas.
 
 ## Validation
 
@@ -42,11 +50,12 @@ User settings use QSettings under `HKEY_CURRENT_USER\Software\Auravlian\Auravlia
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe scripts/capture_preview.py
 .\.venv\Scripts\python.exe scripts/playback_smoke.py
+.\.venv\Scripts\python.exe scripts/library_smoke.py
 # Optional quiet physical-output diagnostic tone:
 .\.venv\Scripts\python.exe scripts/playback_smoke.py --audible
 ```
 
-All 17 Phase 1 tests remain unchanged. Additional tests cover queue ordering, deterministic shuffle, repeat, completion, bounded error recovery, stale callbacks, transport commands, UI signals, shared engine ownership, device errors, loading timeout and volume/mute persistence. Integration tests generate isolated PCM WAVs and exercise real Qt decoding, timing, pause/seek/resume/stop, repeat, transitions, corrupt-input recovery and rapid switching. Real-media tests skip explicitly when the host has no audio output device; no skips occurred on the development host. See `PHASE2_REPORT.md` for executed results.
+All 58 existing Phase 1/2 tests remain unchanged. Phase 3 adds migration/concurrency/rollback checks, metadata/artwork fixtures, scanner/dedup/rescan/persistence tests, missing-file restoration, cancellation/shutdown/UI responsiveness, search/sort over 5,000 model rows and Library UI interactions. Integration tests generate isolated PCM WAVs for real decoding and imported-track playback. Real-media tests skip explicitly when the host has no audio output device; no skips occurred on the development host. See `PHASE3_REPORT.md` for actual commands and results.
 
 Manual checks: launch at 100%, 125%, 150% and 200% Windows scaling; resize to 960×700; traverse navigation with mouse and keyboard; change the startup preference; close and reopen. Preview screenshots are generated from actual Qt widgets in ignored `artifacts/`.
 
@@ -56,14 +65,14 @@ For physical playback: open two known-good local files, listen through the selec
 
 1. Foundation, branding, design system, shells and startup tests — implemented.
 2. One QMediaPlayer/QAudioOutput, authoritative queue, real playback and error handling — implemented.
-3. SQLite migrations/repositories, background import, metadata, artwork, model/view library and search.
+3. SQLite migrations/repositories, background import, metadata, artwork, model/view library and search — implemented.
 4. Playlists, favorites, history, albums and artists.
 5. Expanded Now Playing, lyrics, queue, mini-player, shortcuts and desktop integrations.
 6. Real audio-buffer visualization and device selection; optional DSP feasibility.
 7. Regression, performance, accessibility and Windows compatibility.
 8. Portable executable, original-symbol icon, Inno Setup installer and clean-machine validation.
 
-Phase 2 reuses the existing window, pinned dependencies and persistent bar. Phase 3 requires approval and will add SQLite/library scanning without replacing the shared player or queue.
+Phase 3 preserves the existing window, pinned dependencies, logo, settings, player and queue. Phase 4 requires approval and will add playlists, favorites, history and dedicated album/artist browsing.
 
 ## Packaging
 

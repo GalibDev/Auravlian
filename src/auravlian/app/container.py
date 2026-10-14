@@ -1,5 +1,7 @@
 """Application-owned dependencies, kept outside visual components."""
 from dataclasses import dataclass, field
+from functools import partial
+from pathlib import Path
 
 from PySide6.QtCore import QCoreApplication, QSettings, QThread
 
@@ -7,6 +9,14 @@ from auravlian.application.playback_service import PlaybackService
 from auravlian.domain.playback.queue import PlaybackQueue
 from auravlian.infrastructure.audio.qt_audio_engine import QtAudioEngine
 from auravlian.presentation.viewmodels.player_vm import PlayerViewModel
+from auravlian.application.library_service import LibraryService
+from auravlian.infrastructure.database.migrations import migrate
+from auravlian.infrastructure.database.repositories.library_repository import LibraryRepository
+from auravlian.infrastructure.filesystem.scanner import scan
+from auravlian.infrastructure.cache.artwork_cache import ArtworkCache
+from auravlian.infrastructure.metadata.mutagen_reader import read_track
+from auravlian.presentation.viewmodels.library_vm import LibraryViewModel
+from auravlian.shared.paths import data_path
 
 from auravlian.shared.events import AppEvents
 
@@ -17,6 +27,24 @@ class Container:
     events: AppEvents
     _player: PlayerViewModel | None = field(default=None, init=False, repr=False)
     _saved_audio: tuple[int, bool] | None = field(default=None, init=False, repr=False)
+    _library: LibraryViewModel | None = field(default=None, init=False, repr=False)
+
+    @property
+    def library(self) -> LibraryViewModel:
+        if self._library is None:
+            app = QCoreApplication.instance()
+            if app is None or QThread.currentThread() != app.thread():
+                raise RuntimeError("Create library dependencies on the application thread")
+            # INI-based isolated sessions (tests/previews) keep all data alongside their INI.
+            directory = (Path(self.settings.fileName()).parent / "library"
+                         if self.settings.format() == QSettings.Format.IniFormat else data_path())
+            repository = LibraryRepository(directory / "library.sqlite3")
+            cache = ArtworkCache(directory / "artwork")
+            service = LibraryService(repository, partial(migrate, repository.database), scan,
+                                     partial(read_track, cache=cache), app)
+            self._library = LibraryViewModel(service, self.player.service, app)
+            app.aboutToQuit.connect(service.shutdown)
+        return self._library
 
     @property
     def player(self) -> PlayerViewModel:
