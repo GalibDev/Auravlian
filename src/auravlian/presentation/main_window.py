@@ -39,6 +39,7 @@ class MainWindow(QMainWindow):
         home = HomePage(container.library, container.collections)
         home.open_requested.connect(self.open_files)
         home.library_requested.connect(lambda: self.navigate("Library"))
+        home.collection_requested.connect(self.navigate)
         self.pages: dict[str, QWidget] = {"Home": home}
         for name in ("Albums", "Artists", "Playlists", "Favorites", "Recently Played"):
             self.pages[name] = CollectionPage(name, container.collections)

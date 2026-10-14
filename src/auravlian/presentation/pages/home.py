@@ -1,4 +1,6 @@
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QPixmap
+from auravlian.domain.models.track import Track
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QWidget
 
 from auravlian.presentation.pages.base import label
@@ -9,6 +11,7 @@ from auravlian.presentation.viewmodels.playlist_vm import CollectionViewModel
 class HomePage(QWidget):
     open_requested = Signal()
     library_requested = Signal()
+    collection_requested = Signal(str)
 
     def __init__(self, library: LibraryViewModel | None = None,
                  collections: CollectionViewModel | None = None) -> None:
@@ -46,27 +49,39 @@ class HomePage(QWidget):
         browse.clicked.connect(self.library_requested)
         content.addWidget(browse, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(hero)
-        layout.addWidget(label("Recently Added", "section"))
+        layout.addWidget(label("Your Collections", "section"))
         cards = QHBoxLayout()
         self.collection_labels = []
-        for title, detail in (
-            ("Your albums", "No albums imported"),
-            ("Your artists", "No artists imported"),
-            ("Your favorites", "No favorites yet"),
-            ("Your playlists", "No playlists yet"),
+        self.cards: dict[str, QPushButton] = {}
+        self.artworks: dict[str, QPushButton] = {}
+        for page, title, detail in (
+            ("Albums", "Your albums", "No albums imported"),
+            ("Artists", "Your artists", "No artists imported"),
+            ("Favorites", "Your favorites", "No favorites yet"),
+            ("Playlists", "Your playlists", "No playlists yet"),
         ):
-            card = QFrame()
+            card = QPushButton()
             card.setObjectName("card")
+            card.setAccessibleName(f"Browse {page}")
+            card.setCursor(Qt.CursorShape.PointingHandCursor)
+            card.clicked.connect(lambda checked=False, name=page: self.collection_requested.emit(name))
+            self.cards[page] = card
             body = QVBoxLayout(card)
             body.setContentsMargins(20, 24, 20, 24)
-            placeholder = QFrame()
+            placeholder = QPushButton("♪\nBrowse " + page)
+            placeholder.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+            placeholder.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             placeholder.setObjectName("artworkPlaceholder")
             placeholder.setMinimumHeight(120)
+            self.artworks[page] = placeholder
             body.addWidget(placeholder)
             body.addWidget(label(title, "section"))
             detail_label = label(detail, "subtitle")
             body.addWidget(detail_label)
             self.collection_labels.append(detail_label)
+            for child in (body.itemAt(1).widget(), detail_label):
+                if child is not None:
+                    child.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
             cards.addWidget(card)
         layout.addLayout(cards)
         layout.addWidget(label("Recently Played", "section"))
@@ -91,6 +106,8 @@ class HomePage(QWidget):
         if self.collection_vm is None:
             return
         snapshot = self.collection_vm.service.snapshot
+        self.set_artwork("Favorites", snapshot.favorites)
+        self.set_artwork("Playlists", [track for playlist in snapshot.playlists for track in playlist.tracks])
         self.collection_labels[2].setText(f"{len(snapshot.favorites)} favorites")
         self.collection_labels[3].setText(f"{len(snapshot.playlists)} playlists")
         self.recent_history.setText("  ·  ".join(track.title for track in snapshot.history[:3]) or
@@ -100,6 +117,23 @@ class HomePage(QWidget):
         if self.library_vm is None:
             return
         tracks = self.library_vm.service.tracks
+        self.set_artwork("Albums", tracks)
+        self.set_artwork("Artists", tracks)
         self.collection_labels[0].setText(f"{len({(t.album, t.artist) for t in tracks})} imported albums")
         self.collection_labels[1].setText(f"{len({t.artist for t in tracks})} imported artists")
+
+    def set_artwork(self, page: str, tracks: list[Track]) -> None:
+        from PySide6.QtGui import QIcon
+        from PySide6.QtCore import QSize
+
+        preview = self.artworks[page]
+        preview.setIcon(QIcon())
+        preview.setText("♪\nBrowse " + page if tracks else "♪\nNo music yet")
+        for track in tracks:
+            pixmap = QPixmap(track.artwork_path) if track.artwork_path else QPixmap()
+            if not pixmap.isNull():
+                preview.setIcon(QIcon(pixmap))
+                preview.setIconSize(QSize(160, 120))
+                preview.setText("")
+                break
 

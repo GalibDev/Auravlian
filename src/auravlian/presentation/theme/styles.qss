@@ -3,6 +3,9 @@ QFrame#sidebar, QFrame#playback { background: @sidebar; }
 QFrame#sidebar { border-right: 1px solid @border; }
 QFrame#playback { border-top: 1px solid @border; }
 QFrame#card { background: @surface; border: 1px solid @border; border-radius: 16px; }
+QPushButton#card { background: @surface; border: 1px solid @border; border-radius: 16px; }
+QPushButton#card:hover, QPushButton#card:focus { border-color: @violet; }
+QPushButton#artworkPlaceholder { background: @selected; border: none; border-radius: 12px; font-size: 18px; }
 QFrame#hero { background: qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 @selected,stop:1 @surface); border-radius: 20px; }
 QLabel { background: transparent; }
 QLabel#title { font-size: 30px; font-weight: 700; }
