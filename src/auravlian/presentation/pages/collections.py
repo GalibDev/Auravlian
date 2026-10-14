@@ -1,8 +1,9 @@
 from PySide6.QtCore import QSignalBlocker, Qt
+from PySide6.QtGui import QPixmap
 from pathlib import Path
 from PySide6.QtWidgets import (
     QAbstractItemView, QHBoxLayout, QHeaderView, QInputDialog, QListWidget,
-    QListWidgetItem, QMessageBox, QPushButton, QTableView, QVBoxLayout, QWidget, QFileDialog,
+    QListWidgetItem, QMessageBox, QPushButton, QTableView, QVBoxLayout, QWidget, QFileDialog, QFrame, QLabel,
 )
 
 from auravlian.domain.models.track import Track
@@ -27,6 +28,24 @@ class CollectionPage(QWidget):
         layout.addWidget(label(kind, "title"))
         self.status = label("", "subtitle")
         layout.addWidget(self.status)
+        self.album_header = QFrame()
+        self.album_header.setObjectName("hero")
+        album_layout = QHBoxLayout(self.album_header)
+        album_layout.setContentsMargins(20, 16, 20, 16)
+        self.album_cover = QLabel("♫")
+        self.album_cover.setObjectName("musicCover")
+        self.album_cover.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.album_cover.setFixedSize(112, 112)
+        album_layout.addWidget(self.album_cover)
+        album_info = QVBoxLayout()
+        self.album_title = label("", "section")
+        self.album_title.setWordWrap(True)
+        self.album_detail = label("", "subtitle")
+        self.album_detail.setWordWrap(True)
+        album_info.addWidget(self.album_title)
+        album_info.addWidget(self.album_detail)
+        album_layout.addLayout(album_info, 1)
+        layout.addWidget(self.album_header)
         toolbar = QHBoxLayout()
         editbar = QHBoxLayout()
         self.buttons: dict[str, QPushButton] = {}
@@ -140,6 +159,17 @@ class CollectionPage(QWidget):
         key = item.data(Qt.ItemDataRole.UserRole) if item else "all"
         tracks = self.groups.get(key, [])
         self.model.replace(tracks)
+        self.album_header.setVisible(bool(tracks) and self.kind in ("Albums", "Artists", "Playlists"))
+        self.album_title.setText(str(item.text().rsplit("  ·  ", 1)[0]) if item else self.kind)
+        self.album_detail.setText(f"{len(tracks)} tracks · {sum(t.duration_ms for t in tracks) // 60000} min · Local collection")
+        self.album_cover.clear()
+        artwork = next((t.artwork_path for t in tracks if t.artwork_path), "")
+        pixmap = QPixmap(artwork) if artwork else QPixmap()
+        if pixmap.isNull():
+            self.album_cover.setText("♫")
+        else:
+            self.album_cover.setPixmap(pixmap.scaled(112, 112, Qt.AspectRatioMode.KeepAspectRatio,
+                                                     Qt.TransformationMode.SmoothTransformation))
         # Keep a single row selected after a reorder, without changing the queue.
         if len(selected) == 1:
             for index, track in enumerate(tracks):

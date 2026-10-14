@@ -1,8 +1,8 @@
-from PySide6.QtCore import QByteArray, QTimer
+from PySide6.QtCore import QByteArray, QTimer, Qt
 from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
 from PySide6.QtWidgets import (
     QFileDialog, QHBoxLayout, QMainWindow, QScrollArea, QStackedWidget, QVBoxLayout, QWidget,
-    QApplication, QSystemTrayIcon, QMenu,
+    QApplication, QSystemTrayIcon, QMenu, QLineEdit, QPushButton, QSplitter,
 )
 from PySide6.QtGui import QShortcut
 from auravlian.infrastructure.audio.qt_audio_engine import QtAudioEngine
@@ -58,7 +58,35 @@ class MainWindow(QMainWindow):
             scroll.setWidget(self.pages[name])
             self.stack.addWidget(scroll)
         top.addWidget(self.sidebar)
-        top.addWidget(self.stack, 1)
+        workspace = QWidget()
+        workspace_layout = QVBoxLayout(workspace)
+        workspace_layout.setContentsMargins(0, 0, 0, 0)
+        workspace_layout.setSpacing(0)
+        toolbar = QHBoxLayout()
+        toolbar.setContentsMargins(24, 10, 24, 10)
+        self.global_search = QLineEdit()
+        self.global_search.setPlaceholderText("Search your music • title, artist, album")
+        self.global_search.setAccessibleName("Search all local music")
+        self.global_search.textEdited.connect(self.search_music)
+        toolbar.addWidget(self.global_search, 1)
+        self.queue_toggle = QPushButton("Queue")
+        self.queue_toggle.setCheckable(True)
+        self.queue_toggle.setChecked(bool(container.settings.value("window/queue_visible", True, type=bool)))
+        self.queue_toggle.clicked.connect(self.toggle_queue)
+        toolbar.addWidget(self.queue_toggle)
+        workspace_layout.addLayout(toolbar)
+        self.workspace_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.workspace_splitter.addWidget(self.stack)
+        self.queue_panel = QueuePanel(self.player_vm, self)
+        self.queue_panel.setWindowFlags(Qt.WindowType.Widget)
+        self.queue_panel.setMinimumWidth(240)
+        self.workspace_splitter.addWidget(self.queue_panel)
+        self.workspace_splitter.setStretchFactor(0, 1)
+        self.workspace_splitter.setStretchFactor(1, 0)
+        self.workspace_splitter.setSizes([940, 270])
+        self.queue_panel.setVisible(self.queue_toggle.isChecked())
+        workspace_layout.addWidget(self.workspace_splitter, 1)
+        top.addWidget(workspace, 1)
         vertical.addLayout(top, 1)
         self.playback_bar = PlaybackBar(self.player_vm)
         vertical.addWidget(self.playback_bar)
@@ -68,7 +96,6 @@ class MainWindow(QMainWindow):
         open_action.setShortcut(QKeySequence.StandardKey.Open)
         open_action.triggered.connect(self.open_files)
         menu.addAction(open_action)
-        self.queue_panel = QueuePanel(self.player_vm, self)
         self.mini_player = MiniPlayer(self.player_vm, self)
         view_menu = self.menuBar().addMenu("View")
         for name, action in (("Playback queue", self.show_queue), ("Mini-player", self.show_mini),
@@ -107,8 +134,18 @@ class MainWindow(QMainWindow):
         self.navigate(page if page in PAGES else "Home")
 
     def show_queue(self) -> None:
-        self.queue_panel.show()
-        self.queue_panel.raise_()
+        self.queue_toggle.setChecked(True)
+        self.toggle_queue(True)
+
+    def toggle_queue(self, visible: bool) -> None:
+        self.queue_panel.setVisible(visible)
+        self.container.settings.setValue("window/queue_visible", visible)
+
+    def search_music(self, text: str) -> None:
+        self.navigate("Library")
+        library = self.pages["Library"]
+        if isinstance(library, LibraryPage):
+            library.search.setText(text)
 
     def show_mini(self) -> None:
         self.mini_player.show()

@@ -1,4 +1,10 @@
 QWidget { background: @background; color: @text; font-family: 'Segoe UI'; }
+QPushButton#musicCard { background: @surface; border: 1px solid @border; border-radius: 12px; padding: 0; }
+QPushButton#musicCard:hover { background: @selected; border-color: @violet; }
+QPushButton#musicCard:focus { border: 2px solid @cyan; }
+QLabel#musicCover { background: @selected; border-radius: 10px; font-size: 36px; color: @cyan; }
+QDialog#queuePanel { background: @sidebar; border-left: 1px solid @border; }
+QSplitter::handle { background: @border; width: 1px; }
 QFrame#sidebar, QFrame#playback { background: @sidebar; }
 QFrame#sidebar { border-right: 1px solid @border; }
 QFrame#playback { border-top: 1px solid @border; }
@@ -29,6 +35,10 @@ QCheckBox::indicator:checked { background: @violet; border-color: @violet; }
 QScrollArea { border: none; }
 QScrollBar:vertical { background: @background; width: 8px; }
 QScrollBar::handle:vertical { background: @border; border-radius: 4px; min-height: 30px; }
+QScrollBar:horizontal { background: @background; height: 7px; }
+QScrollBar::handle:horizontal { background: @border; border-radius: 3px; min-width: 32px; }
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
 QToolTip { background: @surface; color: @text; border: 1px solid @border; padding: 6px; }
 QLineEdit { background: @surface; color: @muted; border: none; border-radius: 14px; padding: 14px; }
 QFrame#artworkPlaceholder { background: @selected; border-radius: 12px; }

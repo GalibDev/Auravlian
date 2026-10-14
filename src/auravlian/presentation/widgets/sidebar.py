@@ -15,9 +15,9 @@ class Sidebar(QFrame):
     def __init__(self) -> None:
         super().__init__()
         self.setObjectName("sidebar")
-        self.setFixedWidth(246)
+        self.setFixedWidth(196)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 24, 18, 20)
+        layout.setContentsMargins(14, 20, 14, 16)
         branding = QHBoxLayout()
         logo = QLabel()
         # Crop only the old wordmark; the source symbol pixels are unchanged.

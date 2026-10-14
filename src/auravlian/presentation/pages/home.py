@@ -1,9 +1,10 @@
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 from auravlian.domain.models.track import Track
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QScrollArea, QPushButton, QVBoxLayout, QWidget
 
 from auravlian.presentation.pages.base import label
+from auravlian.presentation.widgets.music_card import MusicCard
 from auravlian.presentation.viewmodels.library_vm import LibraryViewModel
 from auravlian.presentation.viewmodels.playlist_vm import CollectionViewModel
 
@@ -23,20 +24,15 @@ class HomePage(QWidget):
         layout.setSpacing(20)
         header = QHBoxLayout()
         heading = QVBoxLayout()
-        heading.addWidget(label("Welcome home", "section"))
+        heading.addWidget(label("Your dashboard", "title"))
         heading.addWidget(label("Your music, your universe", "subtitle"))
         header.addLayout(heading, 1)
-        search = QLineEdit()
-        search.setPlaceholderText("Search from Music Library")
-        search.setAccessibleName("Use the Music Library page to search")
-        search.setEnabled(False)
-        search.setMaximumWidth(284)
-        header.addWidget(search)
         layout.addLayout(header)
         hero = QFrame()
+        self.hero = hero
         hero.setObjectName("hero")
         content = QVBoxLayout(hero)
-        content.setContentsMargins(30, 30, 30, 30)
+        content.setContentsMargins(24, 18, 24, 18)
         content.addWidget(label("WELCOME TO AURAVLIAN", "eyebrow"))
         content.addWidget(label("Feel every beat.", "title"))
         content.addWidget(label(
@@ -49,6 +45,17 @@ class HomePage(QWidget):
         browse.clicked.connect(self.library_requested)
         content.addWidget(browse, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(hero)
+        layout.addWidget(label("Your music", "section"))
+        self.track_row = QHBoxLayout()
+        self.track_row.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        track_content = QWidget()
+        track_content.setLayout(self.track_row)
+        track_scroll = QScrollArea()
+        track_scroll.setWidgetResizable(True)
+        track_scroll.setWidget(track_content)
+        track_scroll.setFixedHeight(224)
+        track_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        layout.addWidget(track_scroll)
         layout.addWidget(label("Your Collections", "section"))
         cards = QHBoxLayout()
         self.collection_labels = []
@@ -62,20 +69,21 @@ class HomePage(QWidget):
         ):
             card = QPushButton()
             card.setObjectName("card")
+            card.setFixedHeight(170)
             card.setAccessibleName(f"Browse {page}")
             card.setCursor(Qt.CursorShape.PointingHandCursor)
             card.clicked.connect(lambda checked=False, name=page: self.collection_requested.emit(name))
             self.cards[page] = card
             body = QVBoxLayout(card)
-            body.setContentsMargins(20, 24, 20, 24)
+            body.setContentsMargins(12, 12, 12, 12)
             placeholder = QPushButton("♪\nBrowse " + page)
             placeholder.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
             placeholder.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             placeholder.setObjectName("artworkPlaceholder")
-            placeholder.setMinimumHeight(120)
+            placeholder.setFixedHeight(76)
             self.artworks[page] = placeholder
             body.addWidget(placeholder)
-            body.addWidget(label(title, "section"))
+            body.addWidget(label(title, "subtitle"))
             detail_label = label(detail, "subtitle")
             body.addWidget(detail_label)
             self.collection_labels.append(detail_label)
@@ -117,6 +125,18 @@ class HomePage(QWidget):
         if self.library_vm is None:
             return
         tracks = self.library_vm.service.tracks
+        self.hero.setVisible(not tracks)
+        while self.track_row.count():
+            item = self.track_row.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+        for track in tracks[:12]:
+            tile = MusicCard(track)
+            tile.clicked.connect(lambda checked=False, selected=track: self.library_vm.play([selected]))
+            self.track_row.addWidget(tile)
+        if not tracks:
+            self.track_row.addWidget(label("Import your music to see album covers and play songs here.", "subtitle"))
         self.set_artwork("Albums", tracks)
         self.set_artwork("Artists", tracks)
         self.collection_labels[0].setText(f"{len({(t.album, t.artist) for t in tracks})} imported albums")
@@ -133,7 +153,7 @@ class HomePage(QWidget):
             pixmap = QPixmap(track.artwork_path) if track.artwork_path else QPixmap()
             if not pixmap.isNull():
                 preview.setIcon(QIcon(pixmap))
-                preview.setIconSize(QSize(160, 120))
+                preview.setIconSize(QSize(76, 70))
                 preview.setText("")
                 break
 
