@@ -49,7 +49,7 @@ class Sidebar(QFrame):
             self.buttons[page] = button
             layout.addWidget(button)
         layout.addStretch()
-        status = QLabel("OFFLINE FIRST  /  v0.1.0")
+        status = QLabel("OFFLINE FIRST  /  v0.8.0")
         status.setObjectName("eyebrow")
         layout.addWidget(status)
 

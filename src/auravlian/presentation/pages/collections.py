@@ -1,7 +1,8 @@
 from PySide6.QtCore import QSignalBlocker, Qt
+from pathlib import Path
 from PySide6.QtWidgets import (
     QAbstractItemView, QHBoxLayout, QHeaderView, QInputDialog, QListWidget,
-    QListWidgetItem, QMessageBox, QPushButton, QTableView, QVBoxLayout, QWidget,
+    QListWidgetItem, QMessageBox, QPushButton, QTableView, QVBoxLayout, QWidget, QFileDialog,
 )
 
 from auravlian.domain.models.track import Track
@@ -18,6 +19,7 @@ class CollectionPage(QWidget):
         self.kind, self.vm = kind, vm
         self.groups: dict[object, list[Track]] = {}
         self._snapshot: tuple[int, int] | None = None
+        self.importing = False
         layout = QVBoxLayout(self)
         layout.setContentsMargins(36, 30, 36, 30)
         layout.setSpacing(16)
@@ -43,6 +45,14 @@ class CollectionPage(QWidget):
         layout.addLayout(toolbar)
         if kind in ("Playlists", "Favorites"):
             layout.addLayout(editbar)
+        if kind == "Playlists":
+            playlist_io = QHBoxLayout()
+            for name, action in (("Import M3U", self.import_playlist), ("Export M3U", self.export_playlist)):
+                button = QPushButton(name)
+                button.clicked.connect(action)
+                self.buttons[name] = button
+                playlist_io.addWidget(button)
+            layout.addLayout(playlist_io)
         body = QHBoxLayout()
         self.selector = QListWidget()
         self.selector.setMaximumWidth(220)
@@ -85,6 +95,10 @@ class CollectionPage(QWidget):
 
     def refresh(self) -> None:
         service = self.vm.service
+        if self.importing and not service.busy:
+            self.importing = False
+            if not service.error:
+                self.vm.library.service.start()
         self.status.setText(service.error or ("Saving collection…" if service.busy else
                             (f"{service.snapshot.play_count} playback starts · latest 200 tracks"
                              if self.kind == "Recently Played" else "Stored locally on this computer")))
@@ -149,6 +163,8 @@ class CollectionPage(QWidget):
             for name in ("Rename", "Delete"):
                 self.buttons[name].setEnabled(valid and not busy)
             self.buttons["New"].setEnabled(not busy)
+            self.buttons["Import M3U"].setEnabled(not busy and not self.vm.library.service.busy)
+            self.buttons["Export M3U"].setEnabled(valid and not busy)
             self.buttons["Remove"].setEnabled(bool(selected) and not busy)
             rows = self.table.selectionModel().selectedRows()
             row = rows[0].row() if len(rows) == 1 else -1
@@ -201,3 +217,18 @@ class CollectionPage(QWidget):
 
     def unfavorite(self) -> None:
         self.vm.service.favorite([t.path for t in self.selected_tracks()], False)
+
+    def import_playlist(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Import local playlist", "", "M3U (*.m3u *.m3u8)")
+        if path:
+            self.importing = True
+            library = self.vm.library.service
+            self.vm.service.import_m3u(Path(path), library.repository, library.reader)
+
+    def export_playlist(self) -> None:
+        playlist_id = self.playlist_id()
+        if playlist_id is None:
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "Export playlist", "playlist.m3u8", "M3U8 (*.m3u8)")
+        if path:
+            self.vm.service.export_m3u(playlist_id, Path(path))

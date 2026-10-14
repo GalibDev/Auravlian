@@ -2,7 +2,17 @@
 
 **Feel Beyond Sound.** A native, offline-first Windows music player built with Python 3.12 and PySide6 Qt Widgets.
 
-## Current status: Phase 4
+## Current status: 0.8.0 desktop build
+
+Phases 5–8 implementation and local release preparation are now included. Run `dist\Auravlian\Auravlian.exe` directly, or install `dist\Auravlian-Setup-0.8.0.exe`. Python is not required for these built distributions. The portable ZIP contains the whole application folder; keep `_internal` alongside the executable. Build outputs are local artifacts, not committed to Git. See `RELEASE_REPORT.md` and `BUILDING.md` for executed verification and reproducible commands.
+
+Now Playing includes artwork, artwork-derived border accent, synchronized local `.lrc` lyrics, fullscreen mode, a compact always-on-top mini-player, queue selection/removal/clear and a real decoded-audio spectrum. Put `song.lrc` beside `song.mp3` to load lyrics offline. Unsupported capture backends display a fallback; no random bars or simulated audio are used. Spectrum FFT processing is capped at 4,096 samples and 20 updates/second. No equalizer is presented because the Qt output adapter does not implement tested multiband DSP.
+
+Settings selects a Windows audio output and optionally keeps playback in the tray on window close. Tray menu offers Show, Mini-player, Play/Pause, Next and Quit. Otherwise closing stops playback. View opens Queue/Mini-player/Fullscreen. Shortcuts: Ctrl+Space play/pause, Ctrl+Right/Left next/previous, Ctrl+M mute, Ctrl+Shift+M mini-player, F11 fullscreen, Escape leave fullscreen. Local M3U/M3U8 import/export is available on Playlists; network stream entries are rejected. Export writes absolute local paths.
+
+Final source validation: **97 tests passed**, Ruff and mypy passed. Source, portable EXE and installed EXE diagnostics all passed actual generated-WAV decoding, position/seek synchronization, history, LRC loading and decoded buffer capture. Installer/uninstaller and Start Menu shortcut were verified on this Windows 11 host. Clean Windows VM, Windows 10, human sound quality and comprehensive device/codec compatibility remain unverified. Builds are unsigned. See the release report for exact practical limits.
+
+## Earlier collection features
 
 Phase 4 adds persistent playlists, favorites, recently played history and dedicated Albums/Artists browsing. **Playlists → New** creates a playlist; select Library rows and choose **Add to playlist**. Rename/Delete manage the selected playlist, Remove removes selected membership, and Move up/down reorders one selected track. Deleting a playlist keeps your audio files and library entries. Duplicate names (ASCII case-insensitive) and empty names are rejected; names allow up to 120 characters. Playlist membership is unique per track.
 
@@ -82,16 +92,16 @@ For physical playback: open two known-good local files, listen through the selec
 2. One QMediaPlayer/QAudioOutput, authoritative queue, real playback and error handling — implemented.
 3. SQLite migrations/repositories, background import, metadata, artwork, model/view library and search — implemented.
 4. Playlists, favorites, history, albums and artists — implemented.
-5. Expanded Now Playing, lyrics, queue, mini-player, shortcuts and desktop integrations.
-6. Real audio-buffer visualization and device selection; optional DSP feasibility.
-7. Regression, performance, accessibility and Windows compatibility.
-8. Portable executable, original-symbol icon, Inno Setup installer and clean-machine validation.
+5. Expanded Now Playing, lyrics, queue, mini-player, shortcuts and desktop integrations — implemented.
+6. Real audio-buffer visualization and device selection — implemented; optional EQ/DSP omitted.
+7. Regression/performance/local UI checks — executed; broad hardware/OS validation remains manual.
+8. Portable executable, original-symbol icon and Inno Setup installer — built and locally verified; clean-machine validation remains pending.
 
-Phase 4 preserves the existing window, pinned dependencies, logo, settings, player and queue. Phase 5 requires approval for the expanded Now Playing experience, lyrics, queue page, mini-player and desktop integrations.
+The existing layered architecture, original logo and one shared player/queue are preserved throughout.
 
 ## Packaging
 
-Packaging is planned for Phase 8. `packaging/windows.spec` and `packaging/installer.iss` document their deferred status. No executable or installer is claimed or shipped in Phase 1. Later release validation must inspect Qt Multimedia runtime inclusion, physical output devices, actual audio formats, large libraries, and a clean Windows installation/uninstallation.
+`packaging/windows.spec` builds a PyInstaller one-folder distribution and `packaging/installer.iss` builds a per-user Inno Setup installer with Start Menu shortcut, optional desktop shortcut and uninstaller. Qt Multimedia/FFmpeg/runtime DLLs are included. `BUILDING.md` covers build and isolated `--smoke-test` diagnostics. Uninstall retains user library/settings/music. Clean-machine installation has not been tested in this environment.
 
 Design reference: [Auravlian UI kit](https://www.figma.com/design/8ks43deppuJYizCWGV0ZTS/Untitled?node-id=1-2).
 

@@ -9,6 +9,8 @@ from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
 from auravlian.domain.interfaces.repositories import CollectionPort
 from auravlian.domain.models.playlist import CollectionSnapshot
 from auravlian.domain.models.track import Track
+from auravlian.domain.interfaces.repositories import LibraryPort
+from auravlian.application.playlist_io import read_m3u, write_m3u
 
 
 class CollectionSignals(QObject):
@@ -93,6 +95,29 @@ class PlaylistService(QObject):
 
     def record(self, track: Track) -> None:
         self._submit(lambda: self.repository.record_play(track))
+
+    def import_m3u(self, path: Path, library: LibraryPort, reader: Callable[[Path], Track]) -> None:
+        def action() -> None:
+            tracks = [reader(media) for media in read_m3u(path)]
+            if not tracks:
+                raise ValueError("Playlist contains no local tracks.")
+            existing = {p.name.casefold() for p in self.repository.snapshot().playlists}
+            name = path.stem[:100] or "Imported playlist"
+            base, suffix = name, 2
+            while name.casefold() in existing:
+                name = f"{base} ({suffix})"
+                suffix += 1
+            library.upsert(tracks)
+            self.repository.create(name)
+            playlist = next(p for p in self.repository.snapshot().playlists if p.name == name)
+            self.repository.add(playlist.id, [t.path for t in tracks])
+        self._submit(action)
+
+    def export_m3u(self, playlist_id: int, path: Path) -> None:
+        def action() -> None:
+            playlist = next(p for p in self.repository.snapshot().playlists if p.id == playlist_id)
+            write_m3u(path, playlist.tracks)
+        self._submit(action)
 
     def shutdown(self) -> None:
         self._closed = True

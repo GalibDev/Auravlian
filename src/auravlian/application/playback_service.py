@@ -92,6 +92,29 @@ class PlaybackService(QObject):
             self.queue.replace(selected)
             self._load_current()
 
+    def select_queue(self, index: int) -> None:
+        if self.queue.select(index) is not None:
+            self._failed.clear()
+            self._load_current()
+
+    def remove_queue(self, index: int) -> None:
+        current = self.queue.current
+        self.queue.remove(index)
+        if self.queue.current is None:
+            self.stop()
+            self.ready = self.seekable = False
+            self.duration = 0
+        elif self.queue.current != current:
+            self._load_current()
+        self.changed.emit()
+
+    def clear_queue(self) -> None:
+        self.queue.replace([])
+        self.stop()
+        self.ready = self.seekable = False
+        self.duration = 0
+        self.changed.emit()
+
     def play(self) -> None:
         if self.queue.current is None:
             return

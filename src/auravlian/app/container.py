@@ -89,6 +89,12 @@ class Container:
                 volume = 70
             service.set_volume(volume)
             service.set_muted(bool(self.settings.value("audio/muted", False, type=bool)))
+            device_id = str(self.settings.value("audio/device", ""))
+            try:
+                if device_id:
+                    engine.select_device(bytes.fromhex(device_id))
+            except ValueError:
+                self.settings.setValue("audio/device", "")
             self._player = PlayerViewModel(service, app)
             service.changed.connect(self._save_audio_settings)
             app.aboutToQuit.connect(service.shutdown)

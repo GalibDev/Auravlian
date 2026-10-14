@@ -77,6 +77,26 @@ class PlaybackQueue:
             return None
         return self.current
 
+    def select(self, index: int) -> Track | None:
+        if 0 <= index < len(self._order):
+            self._cursor = index
+            return self.current
+        return None
+
+    def remove(self, index: int) -> None:
+        if not 0 <= index < len(self._order):
+            return
+        active = self.current
+        removed = self._order[index]
+        self._tracks = tuple(t for i, t in enumerate(self._tracks) if i != removed)
+        self._order = [i - int(i > removed) for i in self._order if i != removed]
+        if not self._order:
+            self._cursor = -1
+        elif active in self._tracks:
+            self._cursor = self._order.index(self._tracks.index(active))
+        else:
+            self._cursor = min(index, len(self._order) - 1)
+
     @property
     def can_next(self) -> bool:
         return bool(self._order) and (

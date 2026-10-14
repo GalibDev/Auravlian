@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.0 — Desktop experience and local Windows release
+
+- Offline LRC parser/background loading with synchronized highlighting.
+- Queue selection/removal/clear, compact mini-player, fullscreen Now Playing, tray controls and shortcuts.
+- Output-device selection and real QAudioBufferOutput FFT spectrum with bounded processing/fallback.
+- Local M3U import/export and artwork-derived border accents.
+- Serialized concurrent migration startup and full regression/performance checks.
+- Original-symbol-derived .ico, PyInstaller portable executable/ZIP and Inno Setup per-user installer.
+- Isolated packaged-runtime diagnostics, local install/uninstall verification and dependency notices.
+- Clean VM/Windows 10/device-matrix validation remains pending; builds are unsigned.
+
 ## Phase 4 — Personal collections
 
 - Schema version 2 upgrades libraries with playlists, ordered membership, favorites and listening history.

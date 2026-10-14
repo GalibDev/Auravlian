@@ -9,4 +9,5 @@ build/
 dist/
 .reference/
 artifacts/
+.tools/
 

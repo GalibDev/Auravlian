@@ -1,6 +1,9 @@
 from pathlib import Path
+from threading import Lock
 
 from auravlian.infrastructure.database.connection import connection
+
+_MIGRATION_LOCK = Lock()
 
 SCHEMA = (
     "CREATE TABLE artists(id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)",
@@ -30,7 +33,7 @@ COLLECTION_SCHEMA = (
 
 
 def migrate(path: Path) -> None:
-    with connection(path) as db:
+    with _MIGRATION_LOCK, connection(path) as db:
         db.execute("PRAGMA journal_mode=WAL")
         # Lock before reading the version so concurrent startups cannot both migrate v0.
         db.execute("BEGIN IMMEDIATE")

@@ -3,6 +3,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, QTimer, QUrl, Signal, Slot, Qt
 from PySide6.QtMultimedia import QAudioOutput, QMediaDevices, QMediaPlayer
+from auravlian.infrastructure.audio.visualizer import AudioSpectrum
 
 
 class QtAudioEngine(QObject):
@@ -25,6 +26,8 @@ class QtAudioEngine(QObject):
         self.player = QMediaPlayer(self)
         self.output = QAudioOutput(self)
         self.player.setAudioOutput(self.output)
+        self.spectrum = AudioSpectrum(self.player, self)
+        self.selected_device = b""
         queued = Qt.ConnectionType.QueuedConnection
         self._play_requested.connect(self.player.play, queued)
         self._pause_requested.connect(self.player.pause, queued)
@@ -101,6 +104,15 @@ class QtAudioEngine(QObject):
         self._check_thread()
         self.output.setMuted(muted)
 
+    def select_device(self, device_id: bytes) -> None:
+        self._check_thread()
+        device = next((d for d in QMediaDevices.audioOutputs() if d.id().data() == device_id), None)
+        if device_id and device is None:
+            self.error.emit("The selected audio device is unavailable. Choose another output.")
+            return
+        self.selected_device = device_id
+        self.output.setDevice(device or QMediaDevices.defaultAudioOutput())
+
     @Slot(QMediaPlayer.PlaybackState)
     def _state(self, state: QMediaPlayer.PlaybackState) -> None:
         if not self._changing and self.player.source() == self._source:
@@ -168,4 +180,6 @@ class QtAudioEngine(QObject):
             self.stop()
             self.error.emit("Audio output disconnected. Connect a device and try Play again.")
         else:
-            self.output.setDevice(QMediaDevices.defaultAudioOutput())
+            if self.selected_device and not any(d.id().data() == self.selected_device for d in QMediaDevices.audioOutputs()):
+                self.selected_device = b""
+            self.select_device(self.selected_device)

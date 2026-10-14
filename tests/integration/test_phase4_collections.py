@@ -176,3 +176,21 @@ def test_phase4_real_playback_records_once_per_start(qapp, qtbot, container, tmp
     finally:
         player.stop()
         collections.shutdown()
+
+
+def test_m3u_import_export_background_round_trip(qapp, qtbot, collection, tmp_path):
+    repo, library, tracks = collection
+    playlist = tmp_path / "import.m3u8"
+    playlist.write_text("#EXTM3U\n0.wav\n1.wav\n", encoding="utf-8")
+    service = PlaylistService(repo, lambda: migrate(repo.database))
+    try:
+        service.import_m3u(playlist, library, lambda path: Track(path, path.stem))
+        qtbot.waitUntil(lambda: not service.busy)
+        assert not service.error and len(service.snapshot.playlists[0].tracks) == 2
+        target = tmp_path / "export.m3u8"
+        service.export_m3u(service.snapshot.playlists[0].id, target)
+        qtbot.waitUntil(lambda: not service.busy)
+        assert "#EXTM3U" in target.read_text()
+        assert "0.wav" in target.read_text()
+    finally:
+        service.shutdown()
