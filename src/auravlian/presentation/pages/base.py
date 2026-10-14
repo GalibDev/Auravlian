@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout, QWidget
 
 def label(text: str, role: str) -> QLabel:
     widget = QLabel(text)
+    widget.setTextFormat(Qt.TextFormat.PlainText)
     widget.setObjectName(role)
     widget.setWordWrap(True)
     return widget

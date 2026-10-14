@@ -1,10 +1,12 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QWidget
 
 from auravlian.presentation.pages.base import label
 
 
 class HomePage(QWidget):
+    open_requested = Signal()
+
     def __init__(self) -> None:
         super().__init__()
         layout = QVBoxLayout(self)
@@ -30,8 +32,9 @@ class HomePage(QWidget):
         content.addWidget(label("Feel every beat.", "title"))
         content.addWidget(label(
             "Your personal music universe. Entirely offline.", "subtitle"))
-        button = QPushButton("Import music · Phase 3")
-        button.setEnabled(False)
+        button = QPushButton("Open audio files…")
+        button.setObjectName("primary")
+        button.clicked.connect(self.open_requested)
         content.addWidget(button, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(hero)
         layout.addWidget(label("Recently Added", "section"))
@@ -63,6 +66,6 @@ class HomePage(QWidget):
                                     "subtitle"))
         layout.addWidget(recent)
         layout.addStretch()
-        layout.addWidget(label("FOUNDATION PREVIEW  ·  Playback and library features are coming next.",
+        layout.addWidget(label("LOCAL PLAYBACK  ·  Library import arrives in Phase 3.",
                                "subtitle"))
 

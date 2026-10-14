@@ -29,4 +29,10 @@ QScrollBar::handle:vertical { background: @border; border-radius: 4px; min-heigh
 QToolTip { background: @surface; color: @text; border: 1px solid @border; padding: 6px; }
 QLineEdit { background: @surface; color: @muted; border: none; border-radius: 14px; padding: 14px; }
 QFrame#artworkPlaceholder { background: @selected; border-radius: 12px; }
+QToolButton { background: @surface; border: 1px solid @border; border-radius: 6px; padding: 6px; }
+QToolButton:disabled { color: @muted; }
+QToolButton:checked, QPushButton:checked { border-color: @violet; }
+QToolButton:focus { border-color: @cyan; }
+QMenuBar, QMenu { background: @sidebar; color: @text; }
+QMenu::item:selected { background: @selected; }
 

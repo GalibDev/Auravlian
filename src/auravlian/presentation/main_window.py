@@ -1,10 +1,13 @@
 from PySide6.QtCore import QByteArray
-from PySide6.QtGui import QCloseEvent
-from PySide6.QtWidgets import QHBoxLayout, QMainWindow, QScrollArea, QStackedWidget, QVBoxLayout, QWidget
+from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
+from PySide6.QtWidgets import (
+    QFileDialog, QHBoxLayout, QMainWindow, QScrollArea, QStackedWidget, QVBoxLayout, QWidget,
+)
 
 from auravlian.app.container import Container
 from auravlian.presentation.pages.base import EmptyPage
 from auravlian.presentation.pages.home import HomePage
+from auravlian.presentation.pages.now_playing import NowPlayingPage
 from auravlian.presentation.pages.settings import SettingsPage
 from auravlian.presentation.widgets.playback_bar import PlaybackBar
 from auravlian.presentation.widgets.sidebar import PAGES, Sidebar
@@ -25,7 +28,10 @@ class MainWindow(QMainWindow):
         top.setSpacing(0)
         self.sidebar = Sidebar()
         self.stack = QStackedWidget()
-        self.pages: dict[str, QWidget] = {"Home": HomePage()}
+        self.player_vm = container.player
+        home = HomePage()
+        home.open_requested.connect(self.open_files)
+        self.pages: dict[str, QWidget] = {"Home": home}
         definitions = {
             "Library": ("All your music, beautifully together.", "Your library starts here",
                         "Import local files and folders in Phase 3.", 3),
@@ -39,12 +45,13 @@ class MainWindow(QMainWindow):
                           "Mark favorites from your library in Phase 4.", 4),
             "Recently Played": ("Find your way back to a feeling.", "Your history begins with a play",
                                 "Listening history arrives in Phase 4.", 4),
-            "Now Playing": ("Give the music your full attention.", "Nothing playing",
-                            "Real local playback arrives in Phase 2. Expanded view in Phase 5.", 2),
         }
         for name, (subtitle, empty, detail, phase) in definitions.items():
             self.pages[name] = EmptyPage(name, subtitle, empty, detail, phase)
         self.pages["Settings"] = SettingsPage(container.settings)
+        now_playing = NowPlayingPage(self.player_vm)
+        now_playing.open_requested.connect(self.open_files)
+        self.pages["Now Playing"] = now_playing
         for name in PAGES:
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
@@ -53,9 +60,14 @@ class MainWindow(QMainWindow):
         top.addWidget(self.sidebar)
         top.addWidget(self.stack, 1)
         vertical.addLayout(top, 1)
-        self.playback_bar = PlaybackBar()
+        self.playback_bar = PlaybackBar(self.player_vm)
         vertical.addWidget(self.playback_bar)
         self.setCentralWidget(root)
+        menu = self.menuBar().addMenu("File")
+        open_action = QAction("Open audio files…", self)
+        open_action.setShortcut(QKeySequence.StandardKey.Open)
+        open_action.triggered.connect(self.open_files)
+        menu.addAction(open_action)
         self.sidebar.selected.connect(self.navigate)
         settings = container.settings
         geometry = settings.value("window/geometry")
@@ -64,6 +76,13 @@ class MainWindow(QMainWindow):
         page = str(settings.value("window/page", "Home")) if settings.value(
             "startup/remember_page", True, type=bool) else "Home"
         self.navigate(page if page in PAGES else "Home")
+
+    def open_files(self) -> None:
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Open local audio files", "",
+            "Audio files (*.mp3 *.flac *.wav *.ogg *.m4a *.aac *.wma *.opus *.aiff);;All files (*)")
+        if paths:
+            self.player_vm.service.open_files(paths)
 
     def navigate(self, name: str) -> None:
         if name not in PAGES:
@@ -74,6 +93,7 @@ class MainWindow(QMainWindow):
         self.container.events.page_changed.emit(name)
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        self.player_vm.service.stop()
         self.container.settings.setValue("window/geometry", self.saveGeometry())
         self.container.settings.sync()
         super().closeEvent(event)
