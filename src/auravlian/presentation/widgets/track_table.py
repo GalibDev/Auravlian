@@ -14,7 +14,7 @@ def artwork_icon(path: str) -> QIcon:
 
 
 class TrackTableModel(QAbstractTableModel):
-    HEADERS = ("Title", "Artist", "Album", "Duration", "Status")
+    HEADERS: tuple[str, ...] = ("Title", "Artist", "Album", "Duration", "Status")
 
     def __init__(self) -> None:
         super().__init__()

@@ -2,9 +2,9 @@
 from pathlib import Path
 
 TOKENS = {
-    "background": "#0B0D14", "sidebar": "#151824", "surface": "#1D2030",
-    "violet": "#9164FF", "cyan": "#35D6C1", "text": "#F4F5FA",
-    "muted": "#9A9DB3", "border": "#2A2D40", "selected": "#30254C",
+    "background": "#F8D9E0", "sidebar": "#FFFFFF", "surface": "#FF9FBD",
+    "violet": "#F16B99", "cyan": "#B82560", "text": "#171318",
+    "muted": "#70515D", "border": "#20181D", "selected": "#FFC0D2",
 }
 
 

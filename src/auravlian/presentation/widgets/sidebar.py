@@ -40,7 +40,9 @@ class Sidebar(QFrame):
         self.group = QButtonGroup(self)
         self.buttons: dict[str, QPushButton] = {}
         for page in PAGES:
-            button = QPushButton(page)
+            captions = {"Home": "⌂  Dashboard", "Favorites": "♫  Favorite tracks",
+                        "Playlists": "☷  Playlists", "Albums": "◉  Albums", "Artists": "♙  Artists"}
+            button = QPushButton(captions.get(page, page))
             button.setObjectName("nav")
             button.setCheckable(True)
             button.setAccessibleName(f"Navigate to {page}")

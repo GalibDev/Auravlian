@@ -56,3 +56,24 @@ QListWidget { background: @sidebar; border: 1px solid @border; border-radius: 10
 QListWidget::item { padding: 14px 8px; }
 QListWidget::item:selected { background: @selected; color: @text; border-radius: 6px; }
 
+/* Light rose surfaces and crisp outlines, shared by every desktop page. */
+QPushButton { border: 2px solid @border; border-radius: 9px; }
+QPushButton#nav:checked { background: @surface; color: @text; border: 2px solid @border; font-weight: 700; }
+QPushButton#primary { background: @surface; color: @text; border: 2px solid @border; padding: 4px; }
+QPushButton#transport { background: @sidebar; border: none; padding: 3px; font-size: 24px; }
+QPushButton#transport:hover, QPushButton#transport:checked, QPushButton#transport[active="true"] { background: @selected; border: 1px solid @border; }
+QToolButton#playerFavorite { background: transparent; border: none; color: @cyan; font-size: 25px; }
+QLineEdit { background: @sidebar; color: @text; border: 2px solid @border; border-radius: 9px; padding: 9px 12px; }
+QTableView { background: @sidebar; alternate-background-color: @sidebar; border: 2px solid @border; }
+QHeaderView::section { color: @text; font-weight: 600; padding: 9px; border-bottom: 1px solid @border; }
+QListWidget#playlistGallery { background: transparent; border: none; padding: 0; }
+QListWidget#playlistGallery::item { background: @surface; border: 2px solid @border; border-radius: 9px; padding: 8px; }
+QListWidget#playlistGallery::item:selected { background: @selected; border: 3px solid @border; }
+QListWidget#playlistGallery::item:hover { background: @selected; }
+QSlider::groove:horizontal { background: @selected; border: 1px solid @border; height: 8px; border-radius: 4px; }
+QSlider::sub-page:horizontal { background: @surface; border-radius: 4px; }
+QSlider::handle:horizontal { background: @sidebar; border: 1px solid @border; width: 13px; margin: -3px 0; border-radius: 7px; }
+QSlider#playerProgress::groove:horizontal { height: 8px; border-radius: 0; border: none; background: @selected; }
+QSlider#playerProgress::sub-page:horizontal { background: @surface; border-radius: 0; }
+QSlider#playerProgress::handle:horizontal { background: @cyan; width: 3px; border: none; margin: 0; border-radius: 0; }
+

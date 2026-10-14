@@ -42,7 +42,9 @@ class MainWindow(QMainWindow):
         home.collection_requested.connect(self.navigate)
         self.pages: dict[str, QWidget] = {"Home": home}
         for name in ("Albums", "Artists", "Playlists", "Favorites", "Recently Played"):
-            self.pages[name] = CollectionPage(name, container.collections)
+            collection_page = CollectionPage(name, container.collections)
+            collection_page.library_requested.connect(lambda: self.navigate("Library"))
+            self.pages[name] = collection_page
         engine = self.player_vm.service.audio
         self.pages["Settings"] = SettingsPage(container.settings, engine if isinstance(engine, QtAudioEngine) else None)
         self.pages["Library"] = LibraryPage(container.library, container.collections)
@@ -89,6 +91,11 @@ class MainWindow(QMainWindow):
         top.addWidget(workspace, 1)
         vertical.addLayout(top, 1)
         self.playback_bar = PlaybackBar(self.player_vm)
+        self.playback_bar.favorite_requested.connect(self.toggle_current_favorite)
+        container.collections.changed.connect(self.refresh_favorite)
+        self.player_vm.changed.connect(self.refresh_favorite)
+        container.library.changed.connect(self.refresh_favorite)
+        self.refresh_favorite()
         vertical.addWidget(self.playback_bar)
         self.setCentralWidget(root)
         menu = self.menuBar().addMenu("File")
@@ -136,6 +143,23 @@ class MainWindow(QMainWindow):
     def show_queue(self) -> None:
         self.queue_toggle.setChecked(True)
         self.toggle_queue(True)
+
+    def refresh_favorite(self) -> None:
+        track = self.player_vm.service.queue.current
+        collections = self.container.collections.service
+        imported = track is not None and any(t.path == track.path for t in self.container.library.service.tracks)
+        active = track is not None and any(t.path == track.path for t in collections.snapshot.favorites)
+        self.playback_bar.favorite.setEnabled(imported and not collections.busy)
+        self.playback_bar.favorite.setChecked(active)
+        self.playback_bar.favorite.setText("♥" if active else "♡")
+        self.playback_bar.favorite.setToolTip("Remove favorite" if active else
+                                            "Favorite current track" if imported else "Import this track in Library to favorite it")
+
+    def toggle_current_favorite(self) -> None:
+        track = self.player_vm.service.queue.current
+        if track is not None and not self.container.collections.service.busy:
+            active = any(t.path == track.path for t in self.container.collections.service.snapshot.favorites)
+            self.container.collections.service.favorite([track.path], not active)
 
     def toggle_queue(self, visible: bool) -> None:
         self.queue_panel.setVisible(visible)

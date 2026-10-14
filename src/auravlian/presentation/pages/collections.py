@@ -1,19 +1,23 @@
-from PySide6.QtCore import QSignalBlocker, Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QSignalBlocker, Qt, QSize, Signal
+from PySide6.QtGui import QPixmap, QIcon, QPainter, QColor
 from pathlib import Path
 from PySide6.QtWidgets import (
     QAbstractItemView, QHBoxLayout, QHeaderView, QInputDialog, QListWidget,
     QListWidgetItem, QMessageBox, QPushButton, QTableView, QVBoxLayout, QWidget, QFileDialog, QFrame, QLabel,
+    QLineEdit, QMenu, QToolButton,
 )
 
 from auravlian.domain.models.track import Track
 from auravlian.presentation.pages.base import label
 from auravlian.presentation.viewmodels.playlist_vm import CollectionViewModel
 from auravlian.presentation.widgets.track_table import TrackTableModel
+from auravlian.presentation.widgets.favorite_table import FavoriteTableModel
+from auravlian.application.search_service import matches
 
 
 class CollectionPage(QWidget):
     """Album/artist drill-down, ordered playlists, favorites and recent local plays."""
+    library_requested = Signal()
 
     def __init__(self, kind: str, vm: CollectionViewModel) -> None:
         super().__init__()
@@ -21,11 +25,11 @@ class CollectionPage(QWidget):
         self.groups: dict[object, list[Track]] = {}
         self._snapshot: tuple[int, int] | None = None
         self.importing = False
+        self.playlist_detail = False
         layout = QVBoxLayout(self)
         layout.setContentsMargins(36, 30, 36, 30)
         layout.setSpacing(16)
-        layout.addWidget(label("YOUR COLLECTION, YOUR WAY", "eyebrow"))
-        layout.addWidget(label(kind, "title"))
+        layout.addWidget(label("Favorite tracks" if kind == "Favorites" else kind, "title"))
         self.status = label("", "subtitle")
         layout.addWidget(self.status)
         self.album_header = QFrame()
@@ -49,6 +53,9 @@ class CollectionPage(QWidget):
         toolbar = QHBoxLayout()
         editbar = QHBoxLayout()
         self.buttons: dict[str, QPushButton] = {}
+        self.back = QPushButton("← All playlists")
+        self.back.clicked.connect(self.show_overview)
+        toolbar.addWidget(self.back)
         actions = [("Play selected", self.play_selected), ("Play all", self.play_all)]
         if kind == "Playlists":
             actions += [("New", self.create_playlist), ("Rename", self.rename), ("Delete", self.delete),
@@ -61,6 +68,24 @@ class CollectionPage(QWidget):
             button.clicked.connect(action)
             (toolbar if name.startswith("Play ") else editbar).addWidget(button)
             self.buttons[name] = button
+        toolbar.addStretch()
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Filter playlists…" if kind == "Playlists" else "Filter tracks…")
+        self.search.setAccessibleName(f"Filter {kind}")
+        self.search.setMaximumWidth(300)
+        self.search.textChanged.connect(self.filter_content)
+        toolbar.addWidget(self.search)
+        if kind == "Favorites":
+            self.buttons["Play all"].setText("▶")
+            self.buttons["Play all"].setFixedSize(40, 40)
+            self.buttons["Play all"].setToolTip("Play favorite tracks")
+            self.buttons["Play all"].setAccessibleName("Play favorite tracks")
+            add_favorite = QPushButton("+")
+            add_favorite.setFixedSize(40, 40)
+            add_favorite.setToolTip("Add favorites from Library")
+            add_favorite.setAccessibleName("Add favorites from Library")
+            add_favorite.clicked.connect(self.library_requested)
+            toolbar.insertWidget(2, add_favorite)
         layout.addLayout(toolbar)
         if kind in ("Playlists", "Favorites"):
             layout.addLayout(editbar)
@@ -72,16 +97,41 @@ class CollectionPage(QWidget):
                 self.buttons[name] = button
                 playlist_io.addWidget(button)
             layout.addLayout(playlist_io)
+            toolbar.insertWidget(0, self.buttons["New"])
+            toolbar.insertWidget(1, self.buttons["Import M3U"])
+            self.more = QToolButton()
+            self.more.setText("•••")
+            self.more.setAccessibleName("Playlist actions")
+            self.more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+            self.more_menu = QMenu(self.more)
+            self.menu_actions = {}
+            for name in ("Rename", "Delete", "Remove", "Move up", "Move down", "Export M3U"):
+                menu_action = self.more_menu.addAction(name)
+                menu_action.triggered.connect(self.buttons[name].click)
+                self.menu_actions[name] = menu_action
+            self.more.setMenu(self.more_menu)
+            toolbar.addWidget(self.more)
         body = QHBoxLayout()
         self.selector = QListWidget()
         self.selector.setMaximumWidth(220)
         self.selector.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.selector.setTextElideMode(Qt.TextElideMode.ElideRight)
         self.selector.setAccessibleName(f"{kind} groups")
+        if kind == "Playlists":
+            self.selector.setViewMode(QListWidget.ViewMode.IconMode)
+            self.selector.setResizeMode(QListWidget.ResizeMode.Adjust)
+            self.selector.setMovement(QListWidget.Movement.Static)
+            self.selector.setWrapping(True)
+            self.selector.setIconSize(QSize(144, 144))
+            self.selector.setGridSize(QSize(176, 210))
+            self.selector.setSpacing(10)
+            self.selector.setObjectName("playlistGallery")
+            self.selector.itemClicked.connect(lambda _: self.open_playlist())
+            self.selector.itemActivated.connect(lambda _: self.open_playlist())
         self.selector.setVisible(kind in ("Albums", "Artists", "Playlists"))
         self.selector.currentRowChanged.connect(self.load_group)
         body.addWidget(self.selector)
-        self.model = TrackTableModel()
+        self.model = FavoriteTableModel() if kind == "Favorites" else TrackTableModel()
         self.table = QTableView()
         self.table.setModel(self.model)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -94,15 +144,64 @@ class CollectionPage(QWidget):
         self.table.verticalHeader().hide()
         self.table.verticalHeader().setDefaultSectionSize(48)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setIconSize(QSize(40, 40))
+        if kind == "Favorites":
+            self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+            self.table.setColumnWidth(0, 36)
+            self.table.clicked.connect(lambda index: self.unfavorite_at(index.row()) if index.column() == 0 else None)
         self.table.setAccessibleName(f"{kind} tracks")
         self.table.selectionModel().selectionChanged.connect(self.selection_changed)
         self.table.doubleClicked.connect(lambda index: self.vm.play([self.model.tracks[index.row()]]))
-        body.addWidget(self.table, 1)
+        body.addWidget(self.table, 1, Qt.AlignmentFlag.AlignTop if kind == "Favorites" else Qt.AlignmentFlag(0))
         layout.addLayout(body, 1)
         self.empty = label("", "subtitle")
         layout.addWidget(self.empty)
         vm.changed.connect(self.refresh)
         self.refresh()
+
+    def unfavorite_at(self, row: int) -> None:
+        if not self.vm.service.busy and 0 <= row < len(self.model.tracks):
+            self.vm.service.favorite([self.model.tracks[row].path], False)
+
+    def open_playlist(self) -> None:
+        self.playlist_detail = True
+        self.search.clear()
+        self.search.setPlaceholderText("Filter tracks…")
+        self.load_group()
+
+    def show_overview(self) -> None:
+        self.playlist_detail = False
+        self.search.clear()
+        self.search.setPlaceholderText("Filter playlists…")
+        self.load_group()
+
+    def filter_content(self, text: str) -> None:
+        if self.kind == "Playlists" and not self.playlist_detail:
+            for row in range(self.selector.count()):
+                item = self.selector.item(row)
+                item.setHidden(text.casefold() not in item.text().casefold())
+        else:
+            self.load_group()
+
+    def update_layout(self) -> None:
+        overview = self.kind == "Playlists" and not self.playlist_detail
+        self.back.setVisible(self.kind == "Playlists" and self.playlist_detail)
+        self.table.setVisible(not overview)
+        if self.kind == "Playlists":
+            self.selector.setVisible(overview)
+            self.selector.setMaximumWidth(16777215 if overview else 220)
+            for name, button in self.buttons.items():
+                button.setVisible(name in ("New", "Import M3U") if overview else
+                                  name in ("Play selected", "Play all"))
+            self.more.setVisible(not overview)
+            self.buttons["New"].setText("+ Create new")
+        self.album_header.setVisible(not overview and bool(self.model.tracks)
+                                     and self.kind in ("Albums", "Artists", "Playlists"))
+        if self.kind == "Favorites":
+            self.buttons["Play selected"].hide()
+            self.buttons["Remove favorites"].hide()
+        if overview:
+            self.empty.setText("Create a playlist to start your collection." if not self.selector.count() else "")
 
     def selected_tracks(self) -> list[Track]:
         rows = sorted(self.table.selectionModel().selectedRows(), key=lambda row: row.row())
@@ -146,6 +245,25 @@ class CollectionPage(QWidget):
                     item = QListWidgetItem(f"{names[group_key]}  ·  {len(tracks)} tracks")
                     item.setToolTip(f"{names[group_key]} · {len(tracks)} tracks")
                     item.setData(Qt.ItemDataRole.UserRole, group_key)
+                    if self.kind == "Playlists":
+                        item.setText(f"{names[group_key]}\n{len(tracks)} tracks")
+                        item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom)
+                        artwork = next((t.artwork_path for t in tracks if t.artwork_path), "")
+                        if artwork:
+                            item.setIcon(QIcon(artwork))
+                        else:
+                            from auravlian.presentation.theme.tokens import TOKENS
+                            fallback = QPixmap(144, 144)
+                            fallback.fill(QColor(TOKENS["surface"]))
+                            painter = QPainter(fallback)
+                            painter.setPen(QColor(TOKENS["muted"]))
+                            font = painter.font()
+                            font.setPixelSize(64)
+                            painter.setFont(font)
+                            painter.drawText(fallback.rect(), Qt.AlignmentFlag.AlignCenter, "♫")
+                            painter.end()
+                            item.setIcon(QIcon(fallback))
+                        item.setSizeHint(QSize(166, 200))
                     self.selector.addItem(item)
                     if group_key == key:
                         current = row
@@ -158,9 +276,14 @@ class CollectionPage(QWidget):
         item = self.selector.currentItem()
         key = item.data(Qt.ItemDataRole.UserRole) if item else "all"
         tracks = self.groups.get(key, [])
+        if self.search.text() and not (self.kind == "Playlists" and not self.playlist_detail):
+            tracks = [t for t in tracks if matches(t, self.search.text())]
         self.model.replace(tracks)
+        if self.kind == "Favorites":
+            self.table.setMaximumHeight(min(480, 48 * (len(tracks) + 1) + 8))
+            self.status.setVisible(bool(self.vm.service.error) or self.vm.service.busy)
         self.album_header.setVisible(bool(tracks) and self.kind in ("Albums", "Artists", "Playlists"))
-        self.album_title.setText(str(item.text().rsplit("  ·  ", 1)[0]) if item else self.kind)
+        self.album_title.setText(str(item.text().splitlines()[0].rsplit("  ·  ", 1)[0]) if item else self.kind)
         self.album_detail.setText(f"{len(tracks)} tracks · {sum(t.duration_ms for t in tracks) // 60000} min · Local collection")
         self.album_cover.clear()
         artwork = next((t.artwork_path for t in tracks if t.artwork_path), "")
@@ -182,6 +305,7 @@ class CollectionPage(QWidget):
             "Your real playback history will appear here." if self.kind == "Recently Played" else
             "Import music in Library to browse this collection."))
         self.selection_changed()
+        self.update_layout()
 
     def selection_changed(self, *args) -> None:
         selected = self.selected_tracks()
@@ -198,8 +322,10 @@ class CollectionPage(QWidget):
             self.buttons["Remove"].setEnabled(bool(selected) and not busy)
             rows = self.table.selectionModel().selectedRows()
             row = rows[0].row() if len(rows) == 1 else -1
-            self.buttons["Move up"].setEnabled(row > 0 and not busy)
-            self.buttons["Move down"].setEnabled(0 <= row < len(self.model.tracks) - 1 and not busy)
+            self.buttons["Move up"].setEnabled(row > 0 and not busy and not self.search.text())
+            self.buttons["Move down"].setEnabled(0 <= row < len(self.model.tracks) - 1 and not busy and not self.search.text())
+            for name, action in self.menu_actions.items():
+                action.setEnabled(self.buttons[name].isEnabled())
         if self.kind == "Favorites":
             self.buttons["Remove favorites"].setEnabled(bool(selected) and not busy)
 

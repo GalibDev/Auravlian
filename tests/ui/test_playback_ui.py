@@ -57,7 +57,8 @@ def test_loading_controls_and_backend_signals(window, tmp_path, qtbot):
         engine.seekable_changed.emit(True)
         engine.ready_changed.emit(True)
         engine.position_changed.emit(2500)
-        assert bar.buttons["Play"].text() == "Pause"
+        assert bar.buttons["Play"].toolTip() == "Pause"
+        assert not bar.buttons["Play"].icon().isNull()
         assert bar.seek.isEnabled() and bar.seek.value() == 2500
         assert bar.time.text() == "0:02 / 0:10"
         assert not bar.buttons["Next"].isEnabled()
@@ -65,7 +66,7 @@ def test_loading_controls_and_backend_signals(window, tmp_path, qtbot):
         qtbot.mouseClick(bar.buttons["Shuffle"], Qt.MouseButton.LeftButton)
         assert service.queue.shuffle
         qtbot.mouseClick(bar.buttons["Repeat"], Qt.MouseButton.LeftButton)
-        assert bar.buttons["Repeat"].text() == "Repeat: one"
+        assert bar.buttons["Repeat"].toolTip() == "Repeat: one"
         bar.volume.setValue(24)
         qtbot.mouseClick(bar.mute, Qt.MouseButton.LeftButton)
         assert service.volume == 24 and service.muted
